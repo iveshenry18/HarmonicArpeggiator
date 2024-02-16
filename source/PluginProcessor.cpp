@@ -22,12 +22,13 @@ ApiCppWeek3PluginAudioProcessor::ApiCppWeek3PluginAudioProcessor()
       )
 #endif
 {
-    addParameter (mGain = new juce::AudioParameterFloat (
+    addParameter (mGainParameter = new juce::AudioParameterFloat (
                       juce::ParameterID { "gain", 1 },
                       "Gain",
                       0.0f,
                       1.0f,
                       0.5f));
+    mSmoothedGain.setCurrentAndTargetValue (0.5f);
 }
 
 ApiCppWeek3PluginAudioProcessor::~ApiCppWeek3PluginAudioProcessor()
@@ -37,9 +38,8 @@ ApiCppWeek3PluginAudioProcessor::~ApiCppWeek3PluginAudioProcessor()
 //==============================================================================
 void ApiCppWeek3PluginAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
 {
-    // Use this method as the place to do any pre-playback
-    // initialisation that you need..
-    previousGain = *mGain;
+    mSmoothedGain.reset (sampleRate, 0.01f);
+    mSmoothedGain.setTargetValue (mGainParameter->get());
 }
 
 void ApiCppWeek3PluginAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages)
@@ -57,32 +57,52 @@ void ApiCppWeek3PluginAudioProcessor::processBlock (juce::AudioBuffer<float>& bu
     for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i)
         buffer.clear (i, 0, buffer.getNumSamples());
 
-    auto currentGain = mGain->get();
-    if (juce::approximatelyEqual (currentGain, previousGain))
+    mSmoothedGain.setTargetValue (mGainParameter->get());
+
+    float* left_channel = buffer.getWritePointer (0);
+    //    float* right_channel = buffer.getWritePointer (1);
+
+    // simple sine tone generator
+    float sine_hz = 180.f;
+    float phase_delta = sine_hz / getSampleRate();
+    for (int sample_idx = 0; sample_idx < buffer.getNumSamples(); sample_idx++)
     {
-        buffer.applyGain (currentGain);
+        float sine_out = std::sin (mSineTonePhase * 2 * M_PI);
+
+        // Increment phase
+        mSineTonePhase += phase_delta;
+        // Wrap phase
+        if (mSineTonePhase > 1.f)
+        {
+            mSineTonePhase -= 1.f;
+        }
+        left_channel[sample_idx] = sine_out;
+        //        right_channel[sample_idx] = sine_out;
     }
-    else
+
+    for (int sample_idx = 0; sample_idx > buffer.getNumSamples(); sample_idx++)
     {
-        buffer.applyGainRamp (0, buffer.getNumSamples(), previousGain, currentGain);
-        previousGain = currentGain;
+        float gain_value = mSmoothedGain.getNextValue();
+        left_channel[sample_idx] *= gain_value;
+        //        right_channel[sample_idx] *= gain_value;
     }
 }
 
 juce::AudioParameterFloat* ApiCppWeek3PluginAudioProcessor::getGainParameter()
 {
-    return mGain;
+    return mGainParameter;
 }
 
-void ApiCppWeek3PluginAudioProcessor::setGainValue (float inGain)
+void ApiCppWeek3PluginAudioProcessor::setGainParameterValue (float inGain)
 {
     DBG ("Setting gain value to " << inGain << ".");
-    *mGain = inGain;
+    mGainParameter->setValueNotifyingHost (inGain);
+    mSmoothedGain.setTargetValue (inGain);
 }
 
-float ApiCppWeek3PluginAudioProcessor::getGainValue()
+float ApiCppWeek3PluginAudioProcessor::getGainParameterValue()
 {
-    return *mGain;
+    return mGainParameter->get();
 }
 
 //==============================================================================

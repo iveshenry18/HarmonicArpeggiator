@@ -26,8 +26,8 @@ public:
     void processBlock (juce::AudioBuffer<float>&, juce::MidiBuffer&) override;
 
     juce::AudioParameterFloat* getGainParameter();
-    void setGainValue (float inGain);
-    float getGainValue();
+    void setGainParameterValue (float inGain);
+    float getGainParameterValue();
 
     // PRESET / STATE FUNCTIONS
     //==============================================================================
@@ -61,8 +61,10 @@ public:
     void changeProgramName (int index, const juce::String& newName) override;
 
 private:
-    juce::AudioParameterFloat* mGain;
-    float previousGain;
+    juce::AudioParameterFloat* mGainParameter;
+    juce::LinearSmoothedValue<float> mSmoothedGain;
+
+    float mSineTonePhase;
 
     //==============================================================================
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (ApiCppWeek3PluginAudioProcessor)
