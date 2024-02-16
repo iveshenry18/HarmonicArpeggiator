@@ -1,3 +1,5 @@
+> *(I'm using a CMake template so I can use CLion—lmk if that's illegal)*
+
 ![PAMPLEJUCE](assets/images/pamplejuce.png)
 [![](https://github.com/sudara/pamplejuce/workflows/Pamplejuce/badge.svg)](https://github.com/sudara/pamplejuce/actions)
 

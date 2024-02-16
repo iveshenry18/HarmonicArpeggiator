@@ -10,8 +10,11 @@
 
 #include "GainListener.h"
 
-GainListener::GainListener (juce::AudioProcessorEditor& editor) : editor (editor) {};
+GainListener::GainListener (juce::AudioProcessorEditor& editor) : editor (editor) {}
 
+/**
+ * TODO: This crashes the host when I try to use it to resize the editor.
+ */
 void GainListener::parameterValueChanged (int parameterIndex, float newValue)
 {
     DBG ("Parameter " << parameterIndex << " changed to " << newValue);
