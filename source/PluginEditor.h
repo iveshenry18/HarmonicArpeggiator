@@ -1,15 +1,25 @@
+/*
+  ==============================================================================
+
+    This file contains the basic framework code for a JUCE plugin editor.
+
+  ==============================================================================
+*/
+
 #pragma once
 
+#include "GainListener.h"
 #include "PluginProcessor.h"
-#include "BinaryData.h"
-#include "melatonin_inspector/melatonin_inspector.h"
+#include <juce_audio_processors/juce_audio_processors.h>
 
 //==============================================================================
-class PluginEditor : public juce::AudioProcessorEditor
+/**
+*/
+class ApiCppWeek3PluginAudioProcessorEditor : public juce::AudioProcessorEditor
 {
 public:
-    explicit PluginEditor (PluginProcessor&);
-    ~PluginEditor() override;
+    ApiCppWeek3PluginAudioProcessorEditor (ApiCppWeek3PluginAudioProcessor&);
+    ~ApiCppWeek3PluginAudioProcessorEditor() override;
 
     //==============================================================================
     void paint (juce::Graphics&) override;
@@ -18,8 +28,8 @@ public:
 private:
     // This reference is provided as a quick way for your editor to
     // access the processor object that created it.
-    PluginProcessor& processorRef;
-    std::unique_ptr<melatonin::Inspector> inspector;
-    juce::TextButton inspectButton { "Inspect the UI" };
-    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (PluginEditor)
+    ApiCppWeek3PluginAudioProcessor& audioProcessor;
+    GainListener gainListener;
+
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (ApiCppWeek3PluginAudioProcessorEditor)
 };

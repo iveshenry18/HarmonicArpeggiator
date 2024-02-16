@@ -1,48 +1,41 @@
+/*
+  ==============================================================================
+
+    This file contains the basic framework code for a JUCE plugin editor.
+
+  ==============================================================================
+*/
+
 #include "PluginEditor.h"
+#include "GainListener.h"
+#include "PluginProcessor.h"
 
-PluginEditor::PluginEditor (PluginProcessor& p)
-    : AudioProcessorEditor (&p), processorRef (p)
+//==============================================================================
+ApiCppWeek3PluginAudioProcessorEditor::ApiCppWeek3PluginAudioProcessorEditor (ApiCppWeek3PluginAudioProcessor& p)
+    : AudioProcessorEditor (&p), audioProcessor (p), gainListener (*this)
 {
-    juce::ignoreUnused (processorRef);
-
-    addAndMakeVisible (inspectButton);
-
-    // this chunk of code instantiates and opens the melatonin inspector
-    inspectButton.onClick = [&] {
-        if (!inspector)
-        {
-            inspector = std::make_unique<melatonin::Inspector> (*this);
-            inspector->onClose = [this]() { inspector.reset(); };
-        }
-
-        inspector->setVisible (true);
-    };
-
     // Make sure that before the constructor has finished, you've set the
     // editor's size to whatever you need it to be.
-    setSize (400, 300);
+    setSize (audioProcessor.getGainValue() * getParentMonitorArea().getWidth(), 300);
+    setResizable (true, true);
+
+    //    audioProcessor.getGainParameter()->addListener (&gainListener);
 }
 
-PluginEditor::~PluginEditor()
-{
-}
+ApiCppWeek3PluginAudioProcessorEditor::~ApiCppWeek3PluginAudioProcessorEditor() = default;
 
-void PluginEditor::paint (juce::Graphics& g)
+//==============================================================================
+void ApiCppWeek3PluginAudioProcessorEditor::paint (juce::Graphics& g)
 {
     // (Our component is opaque, so we must completely fill the background with a solid colour)
-    g.fillAll (getLookAndFeel().findColour (juce::ResizableWindow::backgroundColourId));
+    g.fillAll (juce::Colours::black);
 
-    auto area = getLocalBounds();
     g.setColour (juce::Colours::white);
-    g.setFont (16.0f);
-    auto helloWorld = juce::String ("Hello from ") + PRODUCT_NAME_WITHOUT_VERSION + " v" VERSION + " running in " + CMAKE_BUILD_TYPE;
-    g.drawText (helloWorld, area.removeFromTop (150), juce::Justification::centred, false);
+    g.setFont (15.0f);
+    g.drawFittedText ("Hey man it's your friend Henry", getLocalBounds(), juce::Justification::centred, 1);
 }
 
-void PluginEditor::resized()
+void ApiCppWeek3PluginAudioProcessorEditor::resized()
 {
-    // layout the positions of your child components here
-    auto area = getLocalBounds();
-    area.removeFromBottom(50);
-    inspectButton.setBounds (getLocalBounds().withSizeKeepingCentre(100, 50));
+    audioProcessor.setGainValue (getWidth() / static_cast<float> (getParentMonitorArea().getWidth()));
 }
