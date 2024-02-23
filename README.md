@@ -1,4 +1,13 @@
-> *(I'm using a CMake template so I can use CLion—lmk if that's illegal)*
+# Audio Programming in C++ Project: Polyrhythmic Counterpoint
+
+Notes -> Pitch ratios -> Polyrhythms.
+
+Based on the [Polyrhythmic Counterpoint web tool](https://polyrhythmic-counterpoint.henryives.com/).
+
+## UI
+![ui v1](design/ui-v1.png)
+
+## Pamplejuce instructions
 
 ![PAMPLEJUCE](assets/images/pamplejuce.png)
 [![](https://github.com/sudara/pamplejuce/workflows/Pamplejuce/badge.svg)](https://github.com/sudara/pamplejuce/actions)
