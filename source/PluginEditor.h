@@ -8,18 +8,19 @@
 
 #pragma once
 
-#include "GainListener.h"
 #include "PluginProcessor.h"
 #include <juce_audio_processors/juce_audio_processors.h>
+
+typedef juce::AudioProcessorValueTreeState::SliderAttachment SliderAttachment;
 
 //==============================================================================
 /**
 */
-class ApiCppWeek3PluginAudioProcessorEditor : public juce::AudioProcessorEditor
+class PluginEditor : public juce::AudioProcessorEditor
 {
 public:
-    ApiCppWeek3PluginAudioProcessorEditor (ApiCppWeek3PluginAudioProcessor&);
-    ~ApiCppWeek3PluginAudioProcessorEditor() override;
+    PluginEditor (PluginProcessor&, juce::AudioProcessorValueTreeState&);
+    ~PluginEditor() override;
 
     //==============================================================================
     void paint (juce::Graphics&) override;
@@ -28,9 +29,11 @@ public:
 private:
     // This reference is provided as a quick way for your editor to
     // access the processor object that created it.
-    ApiCppWeek3PluginAudioProcessor& audioProcessor;
-    juce::Slider gainSlider;
-    GainListener gainListener;
+    PluginProcessor& audioProcessor;
+    juce::AudioProcessorValueTreeState& valueTreeState;
 
-    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (ApiCppWeek3PluginAudioProcessorEditor)
+    juce::Slider gainSlider;
+    std::unique_ptr<SliderAttachment> gainAttachment;
+
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (PluginEditor)
 };

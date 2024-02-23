@@ -13,21 +13,17 @@
 //==============================================================================
 /**
 */
-class ApiCppWeek3PluginAudioProcessor : public juce::AudioProcessor
+class PluginProcessor : public juce::AudioProcessor
 {
 public:
     //==============================================================================
-    ApiCppWeek3PluginAudioProcessor();
-    ~ApiCppWeek3PluginAudioProcessor() override;
+    PluginProcessor();
+    ~PluginProcessor() override;
 
     // AUDIO FUNCTIONS
     //==============================================================================
     void prepareToPlay (double sampleRate, int samplesPerBlock) override;
     void processBlock (juce::AudioBuffer<float>&, juce::MidiBuffer&) override;
-
-    juce::AudioParameterFloat* getGainParameter();
-    void setGainParameterValue (float inGain);
-    float getGainParameterValue();
 
     // PRESET / STATE FUNCTIONS
     //==============================================================================
@@ -61,11 +57,12 @@ public:
     void changeProgramName (int index, const juce::String& newName) override;
 
 private:
-    juce::AudioParameterFloat* mGainParameter;
+    std::atomic<float>* mGainParameter;
     juce::LinearSmoothedValue<float> mSmoothedGain;
+    juce::AudioProcessorValueTreeState parameters;
 
     float mSineTonePhase;
 
     //==============================================================================
-    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (ApiCppWeek3PluginAudioProcessor)
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (PluginProcessor)
 };

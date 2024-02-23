@@ -82,8 +82,7 @@ juce_add_plugin("${PROJECT_NAME}"
 
 # This lets us use our code in both the JUCE targets and our Test target
 # Without running into ODR violations
-add_library(SharedCode INTERFACE
-        source/GainListener.cpp)
+add_library(SharedCode INTERFACE)
 
 # C++20, please
 # Use cxx_std_23 for C++23 (as of CMake v 3.20)

@@ -9,40 +9,43 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
 
+juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout()
+{
+    juce::AudioProcessorValueTreeState::ParameterLayout params;
+    params.add (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID { "gain", 1 }, "Gain", 0.0f, 1.0f, 0.5f));
+    return params;
+}
+
 //==============================================================================
-ApiCppWeek3PluginAudioProcessor::ApiCppWeek3PluginAudioProcessor()
+PluginProcessor::PluginProcessor() :
 #ifndef JucePlugin_PreferredChannelConfigurations
-    : AudioProcessor (BusesProperties()
+                                     AudioProcessor (BusesProperties()
     #if !JucePlugin_IsMidiEffect
         #if !JucePlugin_IsSynth
                           .withInput ("Input", juce::AudioChannelSet::stereo(), true)
         #endif
                           .withOutput ("Output", juce::AudioChannelSet::stereo(), true)
     #endif
-      )
+                                             ),
 #endif
+                                     parameters (*this, nullptr, "PARAMETERS", createParameterLayout())
 {
-    addParameter (mGainParameter = new juce::AudioParameterFloat (
-                      juce::ParameterID { "gain", 1 },
-                      "Gain",
-                      0.0f,
-                      1.0f,
-                      0.5f));
-    mSmoothedGain.setCurrentAndTargetValue (0.5f);
+    mGainParameter = parameters.getRawParameterValue ("gain");
+    mSineTonePhase = 0;
+    mSmoothedGain.setCurrentAndTargetValue (*mGainParameter);
+    // TODO: maybe register a callback here to change mSmoothedGain when mGainParameter changes
 }
 
-ApiCppWeek3PluginAudioProcessor::~ApiCppWeek3PluginAudioProcessor()
-{
-}
+PluginProcessor::~PluginProcessor() = default;
 
 //==============================================================================
-void ApiCppWeek3PluginAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
+void PluginProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
 {
     mSmoothedGain.reset (sampleRate, 0.01f);
-    mSmoothedGain.setTargetValue (mGainParameter->get());
+    mSmoothedGain.setTargetValue (*mGainParameter);
 }
 
-void ApiCppWeek3PluginAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages)
+void PluginProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages)
 {
     juce::ScopedNoDenormals noDenormals;
     auto totalNumInputChannels = getTotalNumInputChannels();
@@ -57,17 +60,18 @@ void ApiCppWeek3PluginAudioProcessor::processBlock (juce::AudioBuffer<float>& bu
     for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i)
         buffer.clear (i, 0, buffer.getNumSamples());
 
-    mSmoothedGain.setTargetValue (mGainParameter->get());
+    // TODO: is this sufficient for keeping smoothed gain up-to-date with the gain param?
+    mSmoothedGain.setTargetValue (*mGainParameter);
 
     float* left_channel = buffer.getWritePointer (0);
-    //    float* right_channel = buffer.getWritePointer (1);
+    float* right_channel = buffer.getWritePointer (1);
 
     // simple sine tone generator
     float sine_hz = 180.f;
-    float phase_delta = sine_hz / getSampleRate();
+    auto phase_delta = static_cast<float> (sine_hz / getSampleRate());
     for (int sample_idx = 0; sample_idx < buffer.getNumSamples(); sample_idx++)
     {
-        float sine_out = std::sin (mSineTonePhase * 2 * M_PI);
+        auto sine_out = static_cast<float> (std::sin (mSineTonePhase * 2 * M_PI));
 
         // Increment phase
         mSineTonePhase += phase_delta;
@@ -77,41 +81,24 @@ void ApiCppWeek3PluginAudioProcessor::processBlock (juce::AudioBuffer<float>& bu
             mSineTonePhase -= 1.f;
         }
         left_channel[sample_idx] = sine_out;
-        //        right_channel[sample_idx] = sine_out;
+        right_channel[sample_idx] = sine_out;
     }
 
-    for (int sample_idx = 0; sample_idx > buffer.getNumSamples(); sample_idx++)
+    for (int sample_idx = 0; sample_idx < buffer.getNumSamples(); sample_idx++)
     {
         float gain_value = mSmoothedGain.getNextValue();
         left_channel[sample_idx] *= gain_value;
-        //        right_channel[sample_idx] *= gain_value;
+        right_channel[sample_idx] *= gain_value;
     }
 }
 
-juce::AudioParameterFloat* ApiCppWeek3PluginAudioProcessor::getGainParameter()
-{
-    return mGainParameter;
-}
-
-void ApiCppWeek3PluginAudioProcessor::setGainParameterValue (float inGain)
-{
-    DBG ("Setting gain value to " << inGain << ".");
-    mGainParameter->setValueNotifyingHost (inGain);
-    mSmoothedGain.setTargetValue (inGain);
-}
-
-float ApiCppWeek3PluginAudioProcessor::getGainParameterValue()
-{
-    return mGainParameter->get();
-}
-
 //==============================================================================
-const juce::String ApiCppWeek3PluginAudioProcessor::getName() const
+const juce::String PluginProcessor::getName() const
 {
     return JucePlugin_Name;
 }
 
-bool ApiCppWeek3PluginAudioProcessor::acceptsMidi() const
+bool PluginProcessor::acceptsMidi() const
 {
 #if JucePlugin_WantsMidiInput
     return true;
@@ -120,7 +107,7 @@ bool ApiCppWeek3PluginAudioProcessor::acceptsMidi() const
 #endif
 }
 
-bool ApiCppWeek3PluginAudioProcessor::producesMidi() const
+bool PluginProcessor::producesMidi() const
 {
 #if JucePlugin_ProducesMidiOutput
     return true;
@@ -129,7 +116,7 @@ bool ApiCppWeek3PluginAudioProcessor::producesMidi() const
 #endif
 }
 
-bool ApiCppWeek3PluginAudioProcessor::isMidiEffect() const
+bool PluginProcessor::isMidiEffect() const
 {
 #if JucePlugin_IsMidiEffect
     return true;
@@ -138,43 +125,43 @@ bool ApiCppWeek3PluginAudioProcessor::isMidiEffect() const
 #endif
 }
 
-double ApiCppWeek3PluginAudioProcessor::getTailLengthSeconds() const
+double PluginProcessor::getTailLengthSeconds() const
 {
     return 0.0;
 }
 
-int ApiCppWeek3PluginAudioProcessor::getNumPrograms()
+int PluginProcessor::getNumPrograms()
 {
     return 1; // NB: some hosts don't cope very well if you tell them there are 0 programs,
         // so this should be at least 1, even if you're not really implementing programs.
 }
 
-int ApiCppWeek3PluginAudioProcessor::getCurrentProgram()
+int PluginProcessor::getCurrentProgram()
 {
     return 0;
 }
 
-void ApiCppWeek3PluginAudioProcessor::setCurrentProgram (int index)
+void PluginProcessor::setCurrentProgram (int index)
 {
 }
 
-const juce::String ApiCppWeek3PluginAudioProcessor::getProgramName (int index)
+const juce::String PluginProcessor::getProgramName (int index)
 {
     return {};
 }
 
-void ApiCppWeek3PluginAudioProcessor::changeProgramName (int index, const juce::String& newName)
+void PluginProcessor::changeProgramName (int index, const juce::String& newName)
 {
 }
 
-void ApiCppWeek3PluginAudioProcessor::releaseResources()
+void PluginProcessor::releaseResources()
 {
     // When playback stops, you can use this as an opportunity to free up any
     // spare memory, etc.
 }
 
 #ifndef JucePlugin_PreferredChannelConfigurations
-bool ApiCppWeek3PluginAudioProcessor::isBusesLayoutSupported (const BusesLayout& layouts) const
+bool PluginProcessor::isBusesLayoutSupported (const BusesLayout& layouts) const
 {
     #if JucePlugin_IsMidiEffect
     juce::ignoreUnused (layouts);
@@ -200,33 +187,41 @@ bool ApiCppWeek3PluginAudioProcessor::isBusesLayoutSupported (const BusesLayout&
 #endif
 
 //==============================================================================
-bool ApiCppWeek3PluginAudioProcessor::hasEditor() const
+bool PluginProcessor::hasEditor() const
 {
     return true; // (change this to false if you choose to not supply an editor)
 }
 
-juce::AudioProcessorEditor* ApiCppWeek3PluginAudioProcessor::createEditor()
+juce::AudioProcessorEditor* PluginProcessor::createEditor()
 {
-    return new ApiCppWeek3PluginAudioProcessorEditor (*this);
+    return new PluginEditor (*this, parameters);
 }
 
 //==============================================================================
-void ApiCppWeek3PluginAudioProcessor::getStateInformation (juce::MemoryBlock& destData)
+void PluginProcessor::getStateInformation (juce::MemoryBlock& destData)
 {
     // You should use this method to store your parameters in the memory block.
     // You could do that either as raw data, or use the XML or ValueTree classes
     // as intermediaries to make it easy to save and load complex data.
+    auto state = parameters.copyState();
+    std::unique_ptr<juce::XmlElement> xml (state.createXml());
+    copyXmlToBinary (*xml, destData);
 }
 
-void ApiCppWeek3PluginAudioProcessor::setStateInformation (const void* data, int sizeInBytes)
+void PluginProcessor::setStateInformation (const void* data, int sizeInBytes)
 {
     // You should use this method to restore your parameters from this memory block,
     // whose contents will have been created by the getStateInformation() call.
+    std::unique_ptr<juce::XmlElement> xmlState (getXmlFromBinary (data, sizeInBytes));
+
+    if (xmlState != nullptr)
+        if (xmlState->hasTagName (parameters.state.getType()))
+            parameters.replaceState (juce::ValueTree::fromXml (*xmlState));
 }
 
 //==============================================================================
 // This creates new instances of the plugin..
 juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter()
 {
-    return new ApiCppWeek3PluginAudioProcessor();
+    return new PluginProcessor();
 }

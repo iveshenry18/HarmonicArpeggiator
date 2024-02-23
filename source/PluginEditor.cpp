@@ -7,28 +7,23 @@
 */
 
 #include "PluginEditor.h"
-#include "GainListener.h"
+
 #include "PluginProcessor.h"
+#include <memory>
 
 //==============================================================================
-ApiCppWeek3PluginAudioProcessorEditor::ApiCppWeek3PluginAudioProcessorEditor (ApiCppWeek3PluginAudioProcessor& p)
-    : AudioProcessorEditor (&p), audioProcessor (p), gainListener (*this)
+PluginEditor::PluginEditor (PluginProcessor& parent, juce::AudioProcessorValueTreeState& vts)
+    : AudioProcessorEditor (&parent), audioProcessor (parent), valueTreeState (vts)
 {
     // Make sure that before the constructor has finished, you've set the
     // editor's size to whatever you need it to be.
-    setSize (static_cast<int> (audioProcessor.getGainParameterValue()
-                               * static_cast<float> (getParentMonitorArea().getWidth())),
-        300);
-    setResizable (true, true);
-
-    //  TODO: this crashes the host when I open the editor after changing the parameter in the host.
-    //  audioProcessor.getGainParameter()->addListener (&gainListener);
+    setSize (500, 300);
 }
 
-ApiCppWeek3PluginAudioProcessorEditor::~ApiCppWeek3PluginAudioProcessorEditor() = default;
+PluginEditor::~PluginEditor() = default;
 
 //==============================================================================
-void ApiCppWeek3PluginAudioProcessorEditor::paint (juce::Graphics& g)
+void PluginEditor::paint (juce::Graphics& g)
 {
     // (Our component is opaque, so we must completely fill the background with a solid colour)
     g.fillAll (juce::Colours::black);
@@ -39,14 +34,12 @@ void ApiCppWeek3PluginAudioProcessorEditor::paint (juce::Graphics& g)
 
     gainSlider.setSliderStyle (juce::Slider::RotaryVerticalDrag);
     gainSlider.setTextBoxStyle (juce::Slider::NoTextBox, false, 0, 0);
-    gainSlider.setRange (0.0, 1.0, 0.01);
-    gainSlider.setValue (audioProcessor.getGainParameterValue());
-    gainSlider.onValueChange = [this] { audioProcessor.setGainParameterValue (static_cast<float> (gainSlider.getValue())); };
     gainSlider.setBounds (0, 0, getWidth(), getHeight());
     addAndMakeVisible (gainSlider);
+
+    gainAttachment = std::make_unique<SliderAttachment> (valueTreeState, "gain", gainSlider);
 }
 
-void ApiCppWeek3PluginAudioProcessorEditor::resized()
+void PluginEditor::resized()
 {
-    audioProcessor.setGainParameterValue (getWidth() / static_cast<float> (getParentMonitorArea().getWidth()));
 }
