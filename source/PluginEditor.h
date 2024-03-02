@@ -32,8 +32,5 @@ private:
     PluginProcessor& audioProcessor;
     juce::AudioProcessorValueTreeState& valueTreeState;
 
-    juce::Slider gainSlider;
-    std::unique_ptr<SliderAttachment> gainAttachment;
-
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (PluginEditor)
 };

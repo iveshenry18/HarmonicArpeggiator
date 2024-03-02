@@ -7,12 +7,12 @@
 */
 
 #include "PluginProcessor.h"
+#include "Fraction.h"
 #include "PluginEditor.h"
 
 juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout()
 {
     juce::AudioProcessorValueTreeState::ParameterLayout params;
-    params.add (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID { "gain", 1 }, "Gain", 0.0f, 1.0f, 0.5f));
     return params;
 }
 
@@ -22,18 +22,14 @@ PluginProcessor::PluginProcessor() :
                                      AudioProcessor (BusesProperties()
     #if !JucePlugin_IsMidiEffect
         #if !JucePlugin_IsSynth
-                          .withInput ("Input", juce::AudioChannelSet::stereo(), true)
+                                                         .withInput ("Input", juce::AudioChannelSet::stereo(), true)
         #endif
-                          .withOutput ("Output", juce::AudioChannelSet::stereo(), true)
+                                                         .withOutput ("Output", juce::AudioChannelSet::stereo(), true)
     #endif
                                              ),
 #endif
                                      parameters (*this, nullptr, "PARAMETERS", createParameterLayout())
 {
-    mGainParameter = parameters.getRawParameterValue ("gain");
-    mSineTonePhase = 0;
-    mSmoothedGain.setCurrentAndTargetValue (*mGainParameter);
-    // TODO: maybe register a callback here to change mSmoothedGain when mGainParameter changes
 }
 
 PluginProcessor::~PluginProcessor() = default;
@@ -41,55 +37,70 @@ PluginProcessor::~PluginProcessor() = default;
 //==============================================================================
 void PluginProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
 {
-    mSmoothedGain.reset (sampleRate, 0.01f);
-    mSmoothedGain.setTargetValue (*mGainParameter);
+    mSampleRate = sampleRate;
+    mSamplesPerBlock = samplesPerBlock;
+    mTimeInSamples = 0;
 }
 
 void PluginProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages)
 {
-    juce::ScopedNoDenormals noDenormals;
-    auto totalNumInputChannels = getTotalNumInputChannels();
-    auto totalNumOutputChannels = getTotalNumOutputChannels();
+    int64_t bufferStartTimeSamples = getPlayHead()->getPosition()->getTimeInSamples().orFallback (mTimeInSamples);
 
-    // In case we have more outputs than inputs, this code clears any output
-    // channels that didn't contain input data, (because these aren't
-    // guaranteed to be empty - they may contain garbage).
-    // This is here to avoid people getting screaming feedback
-    // when they first compile a plugin, but obviously you don't need to keep
-    // this code if your algorithm always overwrites all the output channels.
-    for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i)
-        buffer.clear (i, 0, buffer.getNumSamples());
+    std::vector<juce::MidiMessage> notesToDelete;
+    bool allNotesOff = false;
 
-    // TODO: is this sufficient for keeping smoothed gain up-to-date with the gain param?
-    mSmoothedGain.setTargetValue (*mGainParameter);
-
-    float* left_channel = buffer.getWritePointer (0);
-    float* right_channel = buffer.getWritePointer (1);
-
-    // simple sine tone generator
-    float sine_hz = 180.f;
-    auto phase_delta = static_cast<float> (sine_hz / getSampleRate());
-    for (int sample_idx = 0; sample_idx < buffer.getNumSamples(); sample_idx++)
+    // Populate heldMidiNotes
+    for (auto message : midiMessages)
     {
-        auto sine_out = static_cast<float> (std::sin (mSineTonePhase * 2 * M_PI));
-
-        // Increment phase
-        mSineTonePhase += phase_delta;
-        // Wrap phase
-        if (mSineTonePhase > 1.f)
+        auto messageData = message.getMessage();
+        auto absoluteSamplePosition = message.samplePosition + bufferStartTimeSamples;
+        if (messageData.isNoteOn())
         {
-            mSineTonePhase -= 1.f;
+            heldMidiNotes.insert ({ { messageData.getChannel(), messageData.getNoteNumber() }, { messageData, absoluteSamplePosition } });
         }
-        left_channel[sample_idx] = sine_out;
-        right_channel[sample_idx] = sine_out;
+        else if (messageData.isNoteOff())
+        {
+            notesToDelete.push_back (messageData);
+        }
+        else if (messageData.isAllNotesOff())
+        {
+            allNotesOff = true;
+        }
     }
 
-    for (int sample_idx = 0; sample_idx < buffer.getNumSamples(); sample_idx++)
+    // Compute new retrigs
+    for (const auto& heldNote : heldMidiNotes)
     {
-        float gain_value = mSmoothedGain.getNextValue();
-        left_channel[sample_idx] *= gain_value;
-        right_channel[sample_idx] *= gain_value;
+        int noteNumber = heldNote.first.second;
+        int retrigTime = static_cast<int> (getRetrigTimeSamples (noteNumber));
+        int64_t timeSinceNoteStart = heldNote.second.absoluteSamplePosition - bufferStartTimeSamples;
+
+        int writeHead = (static_cast<int> (timeSinceNoteStart) %  retrigTime) - retrigTime;
+
+        // TODO: something sneaky is wrong. It's probably in here.
+        while (writeHead <= mSamplesPerBlock - 1)
+        {
+            if (writeHead >= 0)
+            {
+                midiMessages.addEvent(juce::MidiMessage::noteOff(heldNote.first.first, heldNote.first.second), writeHead - 1);
+                midiMessages.addEvent (heldNote.second.midiMessage, writeHead);
+            }
+            writeHead += retrigTime;
+        }
     }
+
+    // Erase deleted notes
+    for (const auto& message : notesToDelete)
+    {
+        heldMidiNotes.erase ({ message.getChannel(), message.getNoteNumber() });
+    }
+    if (allNotesOff)
+    {
+        heldMidiNotes.clear();
+    }
+
+    // Update current time (if host doesn't provide time)
+    mTimeInSamples += mSamplesPerBlock;
 }
 
 //==============================================================================
@@ -217,6 +228,44 @@ void PluginProcessor::setStateInformation (const void* data, int sizeInBytes)
     if (xmlState != nullptr)
         if (xmlState->hasTagName (parameters.state.getType()))
             parameters.replaceState (juce::ValueTree::fromXml (*xmlState));
+}
+
+/**
+ * Semitones -> Pitch Ratio
+ * Taken from https://en.wikipedia.org/wiki/Five-limit_tuning
+ */
+std::unordered_map<int, Fraction> pitchRatios = {
+    { 0, { 1, 1 } },    // Unison
+    { 1, { 16, 15 } },  // m2
+    { 2, { 9, 8 } },    // M2
+    { 3, { 6, 5 } },    // m3
+    { 4, { 5, 4 } },    // M3
+    { 5, { 4, 3 } },    // P4
+    { 6, { 45, 32 } },  // TT
+    { 7, { 3, 2 } },    // P5
+    { 8, { 8, 5 } },    // m6
+    { 9, { 5, 3 } },    // M6
+    { 10, { 9, 5 } },   // m7
+    { 11, { 15, 8 } },  // M7
+};
+
+double PluginProcessor::getRetrigTimeSamples (int noteNumber) const
+{
+    int basisNote = 60; // Middle C; TODO: make knob-controlled
+    auto basisNoteSamples = mSampleRate; // 1 second; TODO: make knob- and/or tempo-controlled
+
+    int deltaWithBasis = noteNumber - basisNote;
+    int octaveDelta = deltaWithBasis / 12;
+    int pitchClassDelta = deltaWithBasis % 12;
+    if (pitchClassDelta < 0) {
+        octaveDelta -= 1;
+        pitchClassDelta += 12;
+    }
+    Fraction pitchClassRatio = pitchRatios.at(pitchClassDelta);
+
+    float pitchRatioFromBasis = pitchClassRatio * (static_cast<const float> (pow(2, octaveDelta)));
+
+    return basisNoteSamples / pitchRatioFromBasis;
 }
 
 //==============================================================================

@@ -30,14 +30,7 @@ void PluginEditor::paint (juce::Graphics& g)
 
     g.setColour (juce::Colours::white);
     g.setFont (15.0f);
-    g.drawFittedText ("Hey man it's your friend Henry", getLocalBounds(), juce::Justification::centred, 1);
-
-    gainSlider.setSliderStyle (juce::Slider::RotaryVerticalDrag);
-    gainSlider.setTextBoxStyle (juce::Slider::NoTextBox, false, 0, 0);
-    gainSlider.setBounds (0, 0, getWidth(), getHeight());
-    addAndMakeVisible (gainSlider);
-
-    gainAttachment = std::make_unique<SliderAttachment> (valueTreeState, "gain", gainSlider);
+    g.drawFittedText ("Hey man it's your friend Henry and this is jackass", getLocalBounds(), juce::Justification::centred, 1);
 }
 
 void PluginEditor::resized()

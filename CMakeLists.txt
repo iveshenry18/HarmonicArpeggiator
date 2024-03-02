@@ -27,7 +27,7 @@ set(PRODUCT_NAME "APiCpp Project")
 set(COMPANY_NAME "Henry Ives")
 
 # Change me! Used for the MacOS bundle identifier (and signing)
-set(BUNDLE_ID "com.henryives.APiCppProject")
+set(BUNDLE_ID "com.henryives.apicppproject")
 
 # Change me! Set the plugin formats you want built
 # Valid choices: AAX Unity VST VST3 AU AUv3 Standalone
@@ -78,7 +78,13 @@ juce_add_plugin("${PROJECT_NAME}"
     # This is how it's listed in the DAW
     # This can be different from PROJECT_NAME and can have spaces!
     # You might want to use v${MAJOR_VERSION} here once you go to v2...
-    PRODUCT_NAME "${PRODUCT_NAME}")
+    PRODUCT_NAME "${PRODUCT_NAME}"
+
+    # Custom JUCE Settings
+    IS_MIDI_EFFECT TRUE
+    NEEDS_MIDI_INPUT TRUE
+    NEEDS_MIDI_OUTPUT TRUE
+)
 
 # This lets us use our code in both the JUCE targets and our Test target
 # Without running into ODR violations
