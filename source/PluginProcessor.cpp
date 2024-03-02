@@ -75,14 +75,23 @@ void PluginProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Midi
         int retrigTime = static_cast<int> (getRetrigTimeSamples (noteNumber));
         int64_t timeSinceNoteStart = heldNote.second.absoluteSamplePosition - bufferStartTimeSamples;
 
-        int writeHead = (static_cast<int> (timeSinceNoteStart) %  retrigTime) - retrigTime;
+        int writeHead = (static_cast<int> (timeSinceNoteStart) % retrigTime) - retrigTime;
 
-        // TODO: something sneaky is wrong. It's probably in here.
-        while (writeHead <= mSamplesPerBlock - 1)
+        while (writeHead <= mSamplesPerBlock)
         {
-            if (writeHead >= 0)
+            // Edge case: on/off falls exactly on block boundary
+            if (writeHead == mSamplesPerBlock)
             {
-                midiMessages.addEvent(juce::MidiMessage::noteOff(heldNote.first.first, heldNote.first.second), writeHead - 1);
+                midiMessages.addEvent (juce::MidiMessage::noteOff (heldNote.first.first, heldNote.first.second), writeHead - 1);
+            }
+            else if (writeHead == 0)
+            {
+                midiMessages.addEvent (heldNote.second.midiMessage, writeHead);
+            }
+            // Normal case
+            else if (writeHead > 0)
+            {
+                midiMessages.addEvent (juce::MidiMessage::noteOff (heldNote.first.first, heldNote.first.second), writeHead - 1);
                 midiMessages.addEvent (heldNote.second.midiMessage, writeHead);
             }
             writeHead += retrigTime;
@@ -235,18 +244,18 @@ void PluginProcessor::setStateInformation (const void* data, int sizeInBytes)
  * Taken from https://en.wikipedia.org/wiki/Five-limit_tuning
  */
 std::unordered_map<int, Fraction> pitchRatios = {
-    { 0, { 1, 1 } },    // Unison
-    { 1, { 16, 15 } },  // m2
-    { 2, { 9, 8 } },    // M2
-    { 3, { 6, 5 } },    // m3
-    { 4, { 5, 4 } },    // M3
-    { 5, { 4, 3 } },    // P4
-    { 6, { 45, 32 } },  // TT
-    { 7, { 3, 2 } },    // P5
-    { 8, { 8, 5 } },    // m6
-    { 9, { 5, 3 } },    // M6
-    { 10, { 9, 5 } },   // m7
-    { 11, { 15, 8 } },  // M7
+    { 0, { 1, 1 } }, // Unison
+    { 1, { 16, 15 } }, // m2
+    { 2, { 9, 8 } }, // M2
+    { 3, { 6, 5 } }, // m3
+    { 4, { 5, 4 } }, // M3
+    { 5, { 4, 3 } }, // P4
+    { 6, { 45, 32 } }, // TT
+    { 7, { 3, 2 } }, // P5
+    { 8, { 8, 5 } }, // m6
+    { 9, { 5, 3 } }, // M6
+    { 10, { 9, 5 } }, // m7
+    { 11, { 15, 8 } }, // M7
 };
 
 double PluginProcessor::getRetrigTimeSamples (int noteNumber) const
@@ -257,13 +266,14 @@ double PluginProcessor::getRetrigTimeSamples (int noteNumber) const
     int deltaWithBasis = noteNumber - basisNote;
     int octaveDelta = deltaWithBasis / 12;
     int pitchClassDelta = deltaWithBasis % 12;
-    if (pitchClassDelta < 0) {
+    if (pitchClassDelta < 0)
+    {
         octaveDelta -= 1;
         pitchClassDelta += 12;
     }
-    Fraction pitchClassRatio = pitchRatios.at(pitchClassDelta);
+    Fraction pitchClassRatio = pitchRatios.at (pitchClassDelta);
 
-    float pitchRatioFromBasis = pitchClassRatio * (static_cast<const float> (pow(2, octaveDelta)));
+    float pitchRatioFromBasis = pitchClassRatio * (static_cast<const float> (pow (2, octaveDelta)));
 
     return basisNoteSamples / pitchRatioFromBasis;
 }
