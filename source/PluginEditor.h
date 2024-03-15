@@ -33,8 +33,10 @@ private:
 
     juce::Slider mBasisNoteSlider;
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> mBasisNoteSliderAttachment;
+    juce::Label mBasisNoteLabel;
     juce::Slider mTimeBaseSlider;
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> mTimeBaseSliderAttachment;
+    juce::Label mTimeBaseLabel;
     juce::ToggleButton mSyncTimeToggle;
     std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> mSyncTimeToggleAttachment;
     juce::ToggleButton mLearnBasisNoteToggle;

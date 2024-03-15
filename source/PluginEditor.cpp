@@ -26,6 +26,10 @@ PluginEditor::PluginEditor (PluginProcessor& parent)
         "basis_note",
         mBasisNoteSlider));
 
+    mBasisNoteLabel.setText("Basis Note", juce::dontSendNotification);
+    mBasisNoteLabel.setJustificationType(juce::Justification::centred);
+    addAndMakeVisible(mBasisNoteLabel);
+
     mTimeBaseSlider.setRange (0, 5000);
     mTimeBaseSlider.setTextBoxStyle (juce::Slider::TextBoxBelow, true, 100, 20);
     mTimeBaseSlider.setTitle("Time Base");
@@ -36,6 +40,10 @@ PluginEditor::PluginEditor (PluginProcessor& parent)
         audioProcessor.getVTS(),
         "time_base",
        mTimeBaseSlider));
+
+    mTimeBaseLabel.setText("Time Base", juce::dontSendNotification);
+    mTimeBaseLabel.setJustificationType(juce::Justification::centred);
+    addAndMakeVisible(mTimeBaseLabel);
 
     mSyncTimeToggle.setButtonText("Sync");
     mSyncTimeToggle.setHelpText("Whether the Time Base should be an absolute value (ms) or a rhythmic value");
@@ -64,13 +72,20 @@ PluginEditor::~PluginEditor() = default;
 void PluginEditor::paint (juce::Graphics& g)
 {
     // (Our component is opaque, so we must completely fill the background with a solid colour)
-    g.fillAll (juce::Colours::black);
+    g.fillAll (juce::Colours::grey);
 }
 
 void PluginEditor::resized()
 {
-    mBasisNoteSlider.setBounds(0, 0, 3*getWidth()/10, getHeight());
-    mLearnBasisNoteToggle.setBounds(3*getWidth()/10, 0, getWidth()/5, getHeight());
-    mTimeBaseSlider.setBounds(getWidth()/2, 0, 3*getWidth()/10, getHeight());
-    mSyncTimeToggle.setBounds(4*getWidth()/5, 0, getWidth()/5, getHeight());
+    auto bounds = getLocalBounds();
+    auto knob_area = bounds.removeFromTop(getHeight() * .7);
+    auto label_area = bounds.removeFromTop(getHeight() * .3);
+
+    mBasisNoteSlider.setBounds(knob_area.removeFromLeft(3*getWidth()/10));
+    mLearnBasisNoteToggle.setBounds(knob_area.removeFromLeft(getWidth()/5).removeFromTop(knob_area.getHeight()/2));
+    mTimeBaseSlider.setBounds(knob_area.removeFromLeft(3*getWidth()/10));
+    mSyncTimeToggle.setBounds(knob_area.removeFromLeft(getWidth()/5).removeFromTop(knob_area.getHeight()/2));
+
+    mBasisNoteLabel.setBounds(label_area.removeFromLeft(3*getWidth()/10));
+    mTimeBaseLabel.setBounds(label_area.removeFromRight(getWidth()/2).removeFromLeft(3*getWidth()/10));
 }
