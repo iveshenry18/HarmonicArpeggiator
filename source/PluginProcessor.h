@@ -10,6 +10,7 @@
 
 #include <juce_audio_processors/juce_audio_processors.h>
 
+#include "Fraction.h"
 #include <utility>
 
 using ChannelAndNoteNumber = std::pair<int, int>;
@@ -20,6 +21,12 @@ struct MidiWithStart
     int64_t absoluteSamplePosition;
 
     MidiWithStart (juce::MidiMessage  message, int64_t sample) : midiMessage (std::move(message)), absoluteSamplePosition (sample) {}
+};
+
+union TimeBase
+{
+    float ms;
+    Fraction time;
 };
 
 //==============================================================================
@@ -67,9 +74,11 @@ public:
     void setCurrentProgram (int index) override;
     const juce::String getProgramName (int index) override;
     void changeProgramName (int index, const juce::String& newName) override;
-
+    // EXPOSE VTS TO EDITOR
+    juce::AudioProcessorValueTreeState& getVTS() {
+        return *mValueTreeState;
+    }
 private:
-    juce::AudioProcessorValueTreeState parameters;
 
     double mSampleRate = 44100;
     // If the host doesn't provide transport info, we need to keep track of sample time ourselves
@@ -78,11 +87,18 @@ private:
     // It also happens to be exactly how the playhead behaves in standalone mode
     int64_t mTimeInSamples = 0;
 
+    std::atomic<int>* mBasisNote = nullptr;
+    std::atomic<TimeBase>* mTimeBase = nullptr;
+
     /**
      * (channel, noteNumber) -> midiMessage
      */
     std::map<ChannelAndNoteNumber, MidiWithStart> heldMidiNotes;
     double getRetrigTimeSamples (int number) const;
+
+    std::unique_ptr<juce::AudioProcessorValueTreeState> mValueTreeState;
+    void _constructValueTreeState();
+
 
     //==============================================================================
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (PluginProcessor)

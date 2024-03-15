@@ -10,12 +10,6 @@
 #include "Fraction.h"
 #include "PluginEditor.h"
 
-juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout()
-{
-    juce::AudioProcessorValueTreeState::ParameterLayout params;
-    return params;
-}
-
 //==============================================================================
 PluginProcessor::PluginProcessor() :
 #ifndef JucePlugin_PreferredChannelConfigurations
@@ -26,10 +20,10 @@ PluginProcessor::PluginProcessor() :
         #endif
                                                          .withOutput ("Output", juce::AudioChannelSet::stereo(), true)
     #endif
-                                             ),
+                                     )
 #endif
-                                     parameters (*this, nullptr, "PARAMETERS", createParameterLayout())
 {
+    _constructValueTreeState();
 }
 
 PluginProcessor::~PluginProcessor() = default;
@@ -214,7 +208,7 @@ bool PluginProcessor::hasEditor() const
 
 juce::AudioProcessorEditor* PluginProcessor::createEditor()
 {
-    return new PluginEditor (*this, parameters);
+    return new PluginEditor (*this);
 }
 
 //==============================================================================
@@ -223,7 +217,7 @@ void PluginProcessor::getStateInformation (juce::MemoryBlock& destData)
     // You should use this method to store your parameters in the memory block.
     // You could do that either as raw data, or use the XML or ValueTree classes
     // as intermediaries to make it easy to save and load complex data.
-    auto state = parameters.copyState();
+    auto state = mValueTreeState->copyState();
     std::unique_ptr<juce::XmlElement> xml (state.createXml());
     copyXmlToBinary (*xml, destData);
 }
@@ -235,8 +229,8 @@ void PluginProcessor::setStateInformation (const void* data, int sizeInBytes)
     std::unique_ptr<juce::XmlElement> xmlState (getXmlFromBinary (data, sizeInBytes));
 
     if (xmlState != nullptr)
-        if (xmlState->hasTagName (parameters.state.getType()))
-            parameters.replaceState (juce::ValueTree::fromXml (*xmlState));
+        if (xmlState->hasTagName (mValueTreeState->state.getType()))
+            mValueTreeState->replaceState (juce::ValueTree::fromXml (*xmlState));
 }
 
 /**
@@ -283,4 +277,29 @@ double PluginProcessor::getRetrigTimeSamples (int noteNumber) const
 juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter()
 {
     return new PluginProcessor();
+}
+void PluginProcessor::_constructValueTreeState()
+{
+    mValueTreeState.reset (new juce::AudioProcessorValueTreeState (*this, nullptr, juce::Identifier ("APiCpp Proj"),
+
+        {
+            std::make_unique<juce::AudioParameterInt> (juce::ParameterID ("basis_note", 1), // parameterID
+                "Basis Note", // parameter name
+                0, // minimum value
+                127, // maximum value
+                60), // default value
+            std::make_unique<juce::AudioParameterBool> (juce::ParameterID ("learn_basis", 1), // parameterID
+                                                         "Learn Basis", // parameter name
+                                                            false), // default value
+
+            std::make_unique<juce::AudioParameterFloat> (juce::ParameterID ("time_base", 1), // parameterID
+                                                       "Time Base", // parameter name
+                                                       0.0f, // minimum value
+                                                       100.0f, // maximum value
+                                                       50.0f), // default value
+            std::make_unique<juce::AudioParameterBool> (juce::ParameterID ("sync_time", 1), // parameterID
+                                                        "Sync Time", // parameter name
+                                                        false) // default value
+
+        }));
 }

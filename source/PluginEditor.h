@@ -19,7 +19,7 @@ typedef juce::AudioProcessorValueTreeState::SliderAttachment SliderAttachment;
 class PluginEditor : public juce::AudioProcessorEditor
 {
 public:
-    PluginEditor (PluginProcessor&, juce::AudioProcessorValueTreeState&);
+    PluginEditor (PluginProcessor&);
     ~PluginEditor() override;
 
     //==============================================================================
@@ -30,7 +30,15 @@ private:
     // This reference is provided as a quick way for your editor to
     // access the processor object that created it.
     PluginProcessor& audioProcessor;
-    juce::AudioProcessorValueTreeState& valueTreeState;
+
+    juce::Slider mBasisNoteSlider;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> mBasisNoteSliderAttachment;
+    juce::Slider mTimeBaseSlider;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> mTimeBaseSliderAttachment;
+    juce::ToggleButton mSyncTimeToggle;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> mSyncTimeToggleAttachment;
+    juce::ToggleButton mLearnBasisNoteToggle;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> mLearnBasisNoteToggleAttachment;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (PluginEditor)
 };
