@@ -16,7 +16,7 @@ typedef juce::AudioProcessorValueTreeState::SliderAttachment SliderAttachment;
 //==============================================================================
 /**
 */
-class PluginEditor : public juce::AudioProcessorEditor
+class PluginEditor : public juce::AudioProcessorEditor, public juce::AudioProcessorValueTreeState::Listener
 {
 public:
     PluginEditor (PluginProcessor&);
@@ -26,10 +26,13 @@ public:
     void paint (juce::Graphics&) override;
     void resized() override;
 
+    void parameterChanged (const juce::String& parameterID, float newValue) override;
+
 private:
     // This reference is provided as a quick way for your editor to
     // access the processor object that created it.
     PluginProcessor& audioProcessor;
+    void updateTimeBaseAttachment();
 
     juce::Slider mBasisNoteSlider;
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> mBasisNoteSliderAttachment;

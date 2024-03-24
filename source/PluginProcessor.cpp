@@ -20,10 +20,22 @@ PluginProcessor::PluginProcessor() :
         #endif
                                                          .withOutput ("Output", juce::AudioChannelSet::stereo(), true)
     #endif
-                                     )
+                                             ),
 #endif
+                                     syncManager (this)
 {
-    _constructValueTreeState();
+    _constructValueTreeStates();
+
+    mBasisNote = dynamic_cast<juce::AudioParameterInt*> (mValueTreeState->getParameter ("basis_note"));
+    jassert (mBasisNote != nullptr);
+    mTimeBaseMs = dynamic_cast<juce::AudioParameterInt*> (mValueTreeState->getParameter ("time_base_ms"));
+    jassert (mTimeBaseMs != nullptr);
+    mTimeBaseSync = dynamic_cast<juce::AudioParameterInt*> (mValueTreeState->getParameter ("time_base_sync"));
+    jassert (mTimeBaseSync != nullptr);
+    mSyncTime = dynamic_cast<juce::AudioParameterBool*> (mValueTreeState->getParameter ("sync_time"));
+    jassert (mSyncTime != nullptr);
+    mLearnBasis = dynamic_cast<juce::AudioParameterBool*> (mValueTreeState->getParameter ("learn_basis"));
+    jassert (mLearnBasis != nullptr);
 }
 
 PluginProcessor::~PluginProcessor() = default;
@@ -208,7 +220,9 @@ bool PluginProcessor::hasEditor() const
 
 juce::AudioProcessorEditor* PluginProcessor::createEditor()
 {
-    return new PluginEditor (*this);
+    auto editor = new PluginEditor (*this);
+    mValueTreeState->addParameterListener ("sync_time", editor);
+    return editor;
 }
 
 //==============================================================================
@@ -233,25 +247,6 @@ void PluginProcessor::setStateInformation (const void* data, int sizeInBytes)
             mValueTreeState->replaceState (juce::ValueTree::fromXml (*xmlState));
 }
 
-/**
- * Semitones -> Pitch Ratio
- * Taken from https://en.wikipedia.org/wiki/Five-limit_tuning
- */
-std::unordered_map<int, Fraction> pitchRatios = {
-    { 0, { 1, 1 } }, // Unison
-    { 1, { 16, 15 } }, // m2
-    { 2, { 9, 8 } }, // M2
-    { 3, { 6, 5 } }, // m3
-    { 4, { 5, 4 } }, // M3
-    { 5, { 4, 3 } }, // P4
-    { 6, { 45, 32 } }, // TT
-    { 7, { 3, 2 } }, // P5
-    { 8, { 8, 5 } }, // m6
-    { 9, { 5, 3 } }, // M6
-    { 10, { 9, 5 } }, // m7
-    { 11, { 15, 8 } }, // M7
-};
-
 double PluginProcessor::getRetrigTimeSamples (int noteNumber) const
 {
     int basisNote = 60; // Middle C; TODO: make knob-controlled
@@ -265,7 +260,7 @@ double PluginProcessor::getRetrigTimeSamples (int noteNumber) const
         octaveDelta -= 1;
         pitchClassDelta += 12;
     }
-    Fraction pitchClassRatio = pitchRatios.at (pitchClassDelta);
+    Fraction pitchClassRatio = PITCH_RATIOS.at (pitchClassDelta);
 
     float pitchRatioFromBasis = pitchClassRatio * (static_cast<const float> (pow (2, octaveDelta)));
 
@@ -278,28 +273,37 @@ juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter()
 {
     return new PluginProcessor();
 }
-void PluginProcessor::_constructValueTreeState()
+void PluginProcessor::_constructValueTreeStates()
 {
-    mValueTreeState.reset (new juce::AudioProcessorValueTreeState (*this, nullptr, juce::Identifier ("APiCpp Proj"),
+    mValueTreeState.reset (new juce::AudioProcessorValueTreeState (*this, nullptr, juce::Identifier ("APiCppProjParams"),
 
         {
             std::make_unique<juce::AudioParameterInt> (juce::ParameterID ("basis_note", 1), // parameterID
                 "Basis Note", // parameter name
                 0, // minimum value
                 127, // maximum value
-                60), // default value
-            std::make_unique<juce::AudioParameterBool> (juce::ParameterID ("learn_basis", 1), // parameterID
-                                                         "Learn Basis", // parameter name
-                                                            false), // default value
+                60, // default value
+                juce::AudioParameterIntAttributes().withStringFromValueFunction ([] (auto v1, auto v2) {
+                    return getNoteFromMidiNumber (v1);
+                })),
 
-            std::make_unique<juce::AudioParameterFloat> (juce::ParameterID ("time_base", 1), // parameterID
-                                                       "Time Base", // parameter name
-                                                       0.0f, // minimum value
-                                                       100.0f, // maximum value
-                                                       50.0f), // default value
-            std::make_unique<juce::AudioParameterBool> (juce::ParameterID ("sync_time", 1), // parameterID
-                                                        "Sync Time", // parameter name
-                                                        false) // default value
-
+            std::make_unique<juce::AudioParameterInt> (juce::ParameterID ("time_base_ms", 1), // parameterID
+                "Time Base (ms)", // parameter name
+                0, // minimum value
+                5000, // maximum value
+                500,
+                juce::AudioParameterIntAttributes().withStringFromValueFunction ([] (auto v1, auto v2) {
+                    return std::to_string (v1) + " ms";
+                })), // default value
+            std::make_unique<juce::AudioParameterInt> (juce::ParameterID ("time_base_sync", 1), // parameterID
+                "Time Base (sync)", // parameter name
+                0, // minimum value
+                TIME_DIVISIONS.size() - 1, // maximum value
+                QUARTER_NOTE_INDEX,
+                juce::AudioParameterIntAttributes().withStringFromValueFunction ([] (auto v1, auto v2) {
+                    return TIME_DIVISIONS.at (static_cast<unsigned long> (v1)).timeDivisionString;
+                })),
+            std::make_unique<juce::AudioParameterBool> (juce::ParameterID ("learn_basis", 1), "Learn Basis", false),
+            std::make_unique<juce::AudioParameterBool> (juce::ParameterID ("sync_time", 1), "Sync Time", false),
         }));
 }
