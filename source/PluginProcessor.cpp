@@ -83,7 +83,6 @@ void PluginProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Midi
 
     if (mLearnBasis->get() && latestMessage.has_value())
     {
-        DBG ("Learning new basis: " + std::to_string (latestMessage.value().getMessage().getNoteNumber()) + ", which casts to: " + std::to_string (latestMessage.value().getMessage().getNoteNumber()));
         *mBasisNote = latestMessage.value().getMessage().getNoteNumber();
     }
 
