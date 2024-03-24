@@ -103,6 +103,7 @@ private:
      */
     std::map<ChannelAndNoteNumber, MidiWithStart> heldMidiNotes;
     double getRetrigTimeSamples (int number) const;
+    float computeBasisNoteSamples() const;
 
     std::unique_ptr<juce::AudioProcessorValueTreeState> mValueTreeState;
     void _constructValueTreeStates();

@@ -8,15 +8,21 @@ SyncManager::SyncManager (juce::AudioProcessor* ap) : mProcessor (ap)
 {
 }
 
-void SyncManager::updateCurrentPositionInfo()
+void SyncManager::updateSampleRate()
 {
     mSampleRate = mProcessor->getSampleRate();
+}
+
+void SyncManager::updateCurrentPositionInfo()
+{
     mPlayHead = mProcessor->getPlayHead();
     if (mPlayHead != nullptr)
     {
         auto positionInfo = mPlayHead->getPosition();
         if (positionInfo.hasValue())
             mBPM = juce::jmax ((positionInfo->getBpm().orFallback (60)), 1.);
+        else
+            DBG ("No positionInfo value");
     }
 }
 

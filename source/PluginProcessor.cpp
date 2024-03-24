@@ -46,22 +46,29 @@ void PluginProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
     mSampleRate = sampleRate;
     mSamplesPerBlock = samplesPerBlock;
     mTimeInSamples = 0;
+    syncManager.updateSampleRate();
 }
 
 void PluginProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages)
 {
     int64_t bufferStartTimeSamples = getPlayHead()->getPosition()->getTimeInSamples().orFallback (mTimeInSamples);
+    syncManager.updateCurrentPositionInfo();
 
     std::vector<juce::MidiMessage> notesToDelete;
     bool allNotesOff = false;
 
-    // Populate heldMidiNotes
+    // Populate heldMidiNotes and note to learn
+    std::optional<juce::MidiMessageMetadata> latestMessage;
     for (auto message : midiMessages)
     {
         auto messageData = message.getMessage();
         auto absoluteSamplePosition = message.samplePosition + bufferStartTimeSamples;
         if (messageData.isNoteOn())
         {
+            if (mLearnBasis->get() && (!latestMessage.has_value() || message.samplePosition > latestMessage.value().samplePosition))
+            {
+                latestMessage = message;
+            }
             heldMidiNotes.insert ({ { messageData.getChannel(), messageData.getNoteNumber() }, { messageData, absoluteSamplePosition } });
         }
         else if (messageData.isNoteOff())
@@ -74,14 +81,22 @@ void PluginProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Midi
         }
     }
 
-    // Compute new retrigs
-    for (const auto& heldNote : heldMidiNotes)
+    if (mLearnBasis->get() && latestMessage.has_value())
+    {
+        DBG ("Learning new basis: " + std::to_string (latestMessage.value().getMessage().getNoteNumber()) + ", which casts to: " + std::to_string (latestMessage.value().getMessage().getNoteNumber()));
+        *mBasisNote = latestMessage.value().getMessage().getNoteNumber();
+    }
+
+    /**
+     * Compute new retrigs.
+     */
+    for (auto& heldNote : heldMidiNotes)
     {
         int noteNumber = heldNote.first.second;
         int retrigTime = static_cast<int> (getRetrigTimeSamples (noteNumber));
-        int64_t timeSinceNoteStart = heldNote.second.absoluteSamplePosition - bufferStartTimeSamples;
+        int64_t timeSinceLastTrig = heldNote.second.absoluteSamplePosition - bufferStartTimeSamples;
 
-        int writeHead = (static_cast<int> (timeSinceNoteStart) % retrigTime) - retrigTime;
+        int writeHead = (static_cast<int> (timeSinceLastTrig) % retrigTime) - retrigTime;
 
         while (writeHead <= mSamplesPerBlock)
         {
@@ -93,12 +108,14 @@ void PluginProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Midi
             else if (writeHead == 0)
             {
                 midiMessages.addEvent (heldNote.second.midiMessage, writeHead);
+                heldNote.second.absoluteSamplePosition = writeHead + bufferStartTimeSamples;
             }
             // Normal case
             else if (writeHead > 0)
             {
                 midiMessages.addEvent (juce::MidiMessage::noteOff (heldNote.first.first, heldNote.first.second), writeHead - 1);
                 midiMessages.addEvent (heldNote.second.midiMessage, writeHead);
+                heldNote.second.absoluteSamplePosition = writeHead + bufferStartTimeSamples;
             }
             writeHead += retrigTime;
         }
@@ -247,10 +264,22 @@ void PluginProcessor::setStateInformation (const void* data, int sizeInBytes)
             mValueTreeState->replaceState (juce::ValueTree::fromXml (*xmlState));
 }
 
+float PluginProcessor::computeBasisNoteSamples() const
+{
+    if (mSyncTime->get())
+    {
+        return (syncManager.getTimeDivisionSamples (static_cast<u_long> (mTimeBaseSync->get())));
+    }
+    else
+    {
+        return static_cast<float> ((static_cast<float> (mTimeBaseMs->get()) / 1000.f) * mSampleRate);
+    }
+}
+
 double PluginProcessor::getRetrigTimeSamples (int noteNumber) const
 {
-    int basisNote = 60; // Middle C; TODO: make knob-controlled
-    auto basisNoteSamples = mSampleRate; // 1 second; TODO: make knob- and/or tempo-controlled
+    int basisNote = mBasisNote->get();
+    auto basisNoteSamples = computeBasisNoteSamples();
 
     int deltaWithBasis = noteNumber - basisNote;
     int octaveDelta = deltaWithBasis / 12;
@@ -289,7 +318,7 @@ void PluginProcessor::_constructValueTreeStates()
 
             std::make_unique<juce::AudioParameterInt> (juce::ParameterID ("time_base_ms", 1), // parameterID
                 "Time Base (ms)", // parameter name
-                0, // minimum value
+                50, // minimum value
                 5000, // maximum value
                 500,
                 juce::AudioParameterIntAttributes().withStringFromValueFunction ([] (auto v1, auto v2) {

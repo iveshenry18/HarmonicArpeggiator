@@ -93,7 +93,6 @@ void PluginEditor::parameterChanged (const juce::String& parameterID, float newV
         updateTimeBaseAttachment();
     }
 }
-#pragma clang diagnostic pop
 //==============================================================================
 void PluginEditor::paint (juce::Graphics& g)
 {

@@ -52,11 +52,12 @@ static const int QUARTER_NOTE_INDEX = 15;
 class SyncManager
 {
 public:
-    SyncManager (juce::AudioProcessor* ap);
+    explicit SyncManager (juce::AudioProcessor* ap);
+    void updateCurrentPositionInfo();
+    [[nodiscard]] float getTimeDivisionSamples (u_long inDivision) const;
+    void updateSampleRate();
 
 private:
-    void updateCurrentPositionInfo();
-    float getTimeDivisionSamples (u_long inDivision) const;
     juce::AudioProcessor* mProcessor = nullptr;
     double mSampleRate = 44100;
     juce::AudioPlayHead* mPlayHead = nullptr;
