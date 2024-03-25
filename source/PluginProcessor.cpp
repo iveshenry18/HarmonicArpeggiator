@@ -54,7 +54,7 @@ void PluginProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Midi
     int64_t bufferStartTimeSamples = getPlayHead()->getPosition()->getTimeInSamples().orFallback (mTimeInSamples);
     syncManager.updateCurrentPositionInfo();
 
-    std::vector<juce::MidiMessage> notesToDelete;
+    std::map<ChannelAndNoteNumber, MidiWithStart> notesToDelete;
     bool allNotesOff = false;
 
     // Populate heldMidiNotes and note to learn
@@ -73,7 +73,7 @@ void PluginProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Midi
         }
         else if (messageData.isNoteOff())
         {
-            notesToDelete.push_back (messageData);
+            notesToDelete.insert ({ { messageData.getChannel(), messageData.getNoteNumber() }, { messageData, absoluteSamplePosition } });
         }
         else if (messageData.isAllNotesOff())
         {
@@ -96,8 +96,10 @@ void PluginProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Midi
         int64_t timeSinceLastTrig = heldNote.second.absoluteSamplePosition - bufferStartTimeSamples;
 
         int writeHead = (static_cast<int> (timeSinceLastTrig) % retrigTime) - retrigTime;
+        // If the given note ends in this window, only write new notes up to where it cuts off
+        int64_t writeWindow = notesToDelete.contains (heldNote.first) ? notesToDelete.at (heldNote.first).absoluteSamplePosition - 1 : mSamplesPerBlock;
 
-        while (writeHead <= mSamplesPerBlock)
+        while (writeHead <= writeWindow)
         {
             // Edge case: on/off falls exactly on block boundary
             if (writeHead == mSamplesPerBlock)
@@ -121,9 +123,9 @@ void PluginProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Midi
     }
 
     // Erase deleted notes
-    for (const auto& message : notesToDelete)
+    for (const auto& noteToDelete : notesToDelete)
     {
-        heldMidiNotes.erase ({ message.getChannel(), message.getNoteNumber() });
+        heldMidiNotes.erase (noteToDelete.first);
     }
     if (allNotesOff)
     {
