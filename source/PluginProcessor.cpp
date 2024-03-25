@@ -95,9 +95,9 @@ void PluginProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Midi
         int retrigTime = static_cast<int> (getRetrigTimeSamples (noteNumber));
         int64_t timeSinceLastTrig = heldNote.second.absoluteSamplePosition - bufferStartTimeSamples;
 
-        int writeHead = (static_cast<int> (timeSinceLastTrig) % retrigTime) - retrigTime;
+        int writeHead = (static_cast<int> (timeSinceLastTrig) % retrigTime);
         // If the given note ends in this window, only write new notes up to where it cuts off
-        int64_t writeWindow = notesToDelete.contains (heldNote.first) ? notesToDelete.at (heldNote.first).absoluteSamplePosition - 1 : mSamplesPerBlock;
+        int64_t writeWindow = notesToDelete.contains (heldNote.first) ? notesToDelete.at (heldNote.first).absoluteSamplePosition - bufferStartTimeSamples - 1 : mSamplesPerBlock;
 
         while (writeHead <= writeWindow)
         {
