@@ -10,6 +10,8 @@ CTestTestfile.cmake
 _deps
 **/.DS_Store
 *.bak
+packaging/dmg
+packaging/out
 
 # It's nice to have the Builds folder exist, to remind us where it is
 Builds/*
@@ -29,3 +31,4 @@ cmake-build-debug
 cmake-build-release
 cmake-build-relwithdebinfo
 packaging/Output/*
+/set_env.local.sh

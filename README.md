@@ -4,6 +4,18 @@ Notes -> Pitch ratios -> Polyrhythms.
 
 Based on the [Polyrhythmic Counterpoint web tool](https://polyrhythmic-counterpoint.henryives.com/).
 
+## Building
+Follow Pamplejuce instructions below.
+
+### Creating a signed and notarized dmg
+1. Build the project in Release mode.
+2. Copy the set_env.example.sh script to set_env.local.sh and fill in the required environment variables.
+3. Run the following command:
+    ```bash
+    . ./set_env.local.sh && . ./make_dmg.sh -v <version> [-n]
+    ```
+4. The dmg file will be created in the `packaging/out` directory.
+
 ## UI
 ![ui v1](design/ui-v1.png)
 
