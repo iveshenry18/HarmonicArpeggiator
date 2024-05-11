@@ -51,7 +51,10 @@ void PluginProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
 
 void PluginProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages)
 {
-    int64_t bufferStartTimeSamples = getPlayHead()->getPosition()->getTimeInSamples().orFallback (mTimeInSamples);
+    // Use time in samples if transport isn't playing
+    int64_t bufferStartTimeSamples = getPlayHead()->getPosition()->getIsPlaying()
+                                         ? getPlayHead()->getPosition()->getTimeInSamples().orFallback (mTimeInSamples)
+                                         : mTimeInSamples;
     syncManager.updateCurrentPositionInfo();
 
     std::map<ChannelAndNoteNumber, MidiWithStart> notesToDelete;
