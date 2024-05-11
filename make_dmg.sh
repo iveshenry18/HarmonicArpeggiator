@@ -18,6 +18,7 @@ if [ -z "$VERSION" ]; then
   exit 1
 fi
 
+# TODO: Manage this script from CMakelists.txt to auto-fill these variables
 BUNDLE_ID="com.henryives.harmonicarpeggiator"
 ARTIFACTS_PATH=cmake-build-release/HarmonicArpeggiator_artefacts/Release
 PRODUCT_NAME="Harmonic Arpeggiator"
