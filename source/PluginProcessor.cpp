@@ -308,7 +308,7 @@ juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter()
 }
 void PluginProcessor::_constructValueTreeStates()
 {
-    mValueTreeState.reset (new juce::AudioProcessorValueTreeState (*this, nullptr, juce::Identifier ("APiCppProjParams"),
+    mValueTreeState.reset (new juce::AudioProcessorValueTreeState (*this, nullptr, juce::Identifier ("HarmonicArpeggiatorParams"),
 
         {
             std::make_unique<juce::AudioParameterInt> (juce::ParameterID ("basis_note", 1), // parameterID
